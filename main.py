@@ -104,6 +104,33 @@ if __name__ == '__main__':
     # plt.show()
 
 
+# BDE Main
+def conduct_BIG(user_action,clusters_in_view,k,re,prior,n_count,recluster_count,previous_x,is_recluster):
+    is_recluster=False
+    # 가장 높은 theta가 clusters_in_view에 있는지 확인
+    if count_detect(user_action, clusters_in_view, prior, previous_x)==True: # count_detect는 utils.py에 있는 함수
+        n_count+=1
+    else:
+        n_count=n_count
+    if n_count==k:
+        recluster_count+=1
+        n_count=0
+        prior=np.ones((len(prior),),dtype=float)/len(prior)
+    else:
+        prior=posterior(previous_x,user_action,prior) # posterior는 utils.py에 있는 함수
+    # next view 생성
+    previous_x=Smooth_ViewSearch(user_action,clusters_in_view,prior) # Smooth_ViewSearch는 utils.py에 있는 함수
+    # re-clustering 시점 확인
+    if recluster_count==re:
+        is_recluster=True
+        recluster_count=0
+    else:
+        pass
+    return prior, previous_x, is_recluster, n_count, recluster_count
+
+prior, previous_x, is_recluster, n_count, recluster_count = conduct_BIG(user_action,clusters_in_view,k,re,prior,n_count,recluster_count,previous_x,is_recluster)
+
+
 
 
 

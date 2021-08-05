@@ -57,8 +57,8 @@ def overallshape_similarity(user_overallshape_data, reference_overallshape_data)
 
 # BDE 전역변수
 n = 17 # 클러스터 개수
-k = 0 # theta 초기화해주기 위한 임계치. n_count가 k가 되면 theta가 초기화된다.
-re = 0 # re-clustering을 제안해주기 위한 임계치. is_recluster가 True가 되면 사용자에게 re-clustering을 제안한다.
+initialize = 3 # theta 초기화해주기 위한 임계치. n_count가 k가 되면 theta가 초기화된다.
+re = 3 # re-clustering을 제안해주기 위한 임계치. is_recluster가 True가 되면 사용자에게 re-clustering을 제안한다.
 prior = np.ones(n,dtype=float)/n # 최초 theta로서, 똑같이 1/n을 주며, iteration이 진행될 때마다 업데이트된다.
 n_count = 0 # theta에 반하는 행동 수를 의미. k에 다다르면 다시 0으로 바뀐다.
 recluster_count = 0 # recluster_count값이 re에 이르면 is_recluster를 True로 바꿔주도록 코드가 짜여있다.
@@ -73,8 +73,9 @@ def views(spec):
         X+=list(itertools.combinations(spec,i))
     return(X)
 
-def like(target,n,x):
+def like(target,x):
     prob=list()
+    # 승원 혹시 에러 뜨면 이 부분 한번더 체크해봐야 될 거야. 그때 나 한번만 불러줘.
     if (type(x)==int):
         k=1
         if (not(target==x) and k==1):
@@ -91,12 +92,12 @@ def like(target,n,x):
             prob=[(k-1)/n,(n+1-k)/(3*n),(n+1-k)/(3*n),(n+1-k)/(3*n)]
     return(prob)
 
-def cond_ent(x,prior):
+def cond_ent(x):
     n=len(prior)
     Theta=list(range(0,n))
     first=np.zeros(len(Theta))
     for i in range(0,len(Theta)):
-        temp=like(Theta[i],n,x)
+        temp=like(Theta[i],x)
         for j in range(0,len(temp)):
             if (temp[j]==0):
                 temp[j]=1
@@ -106,56 +107,56 @@ def cond_ent(x,prior):
     final=(-sum(first*prior))
     return(final)
 
-def marg(x,prior,n_y=4):
+def marg(x,n_y=4):
     n=len(prior)
     Theta=list(range(0,n))
     first=np.zeros((len(Theta),n_y))
     for i in range(0,len(Theta)):
-        first[i,]=like(Theta[i],n,x)
+        first[i,]=like(Theta[i],x)
     final=np.zeros(n_y)
     for j in range(0,n_y):
         final[j]=sum(pd.DataFrame(first).loc[:,j]*prior)
     return(final)
 
-def marg_ent(x,prior,n_y=4):
+def marg_ent(x,n_y=4):
     n=len(prior)
     Theta=list(range(0,n))
     first=np.zeros(len(Theta))
-    temp=marg(x,prior)
+    temp=marg(x)
     for i in range(0,len(temp)):
         if (temp[i]==0):
             temp[i]=1
         else:
             temp[i]=temp[i]
     for j in range(0,len(Theta)):
-        first[j]=sum(like(Theta[j],n,x)*np.log(temp))
+        first[j]=sum(like(Theta[j],x)*np.log(temp))
     final=(-sum(first*prior))
     return(final)
 
-def IG(x,prior,n_y=4):
-    final=marg_ent(x,prior,n_y=4)-cond_ent(x,prior)
+def IG(x,n_y=4):
+    final=marg_ent(x,n_y=4)-cond_ent(x)
     return(final)
 
-def max_IG(X,prior,n_y=4):
+def max_IG(X,n_y=4):
     n=len(prior)
     final=np.zeros(len(X))
     for i in range(0,len(X)):
         if i<n:
-            final[i]=IG(X[i][0],prior)
+            final[i]=IG(X[i][0])
         else:
-            final[i]=IG(X[i],prior)
+            final[i]=IG(X[i])
     return(final)
 
-def posterior(x,y,prior,n_y=4):
+def posterior(x,y,n_y=4):
     n=len(prior)
     Theta=list(range(0,n))
     likeli=np.zeros(len(Theta))
     for i in range(0,len(Theta)):
-        likeli[i]=like(Theta[i],n,x)[y-1]
+        likeli[i]=like(Theta[i],x)[y-1]
     post=(likeli*prior)/sum(likeli*prior)
     return(post)
 
-def count_detect(user_action,clusters_in_view,prior,previous_x):
+def count_detect(user_action,clusters_in_view):
     n=len(prior)
     #Theta=list(range(0,n))
     clusters_in_view.sort()
@@ -180,8 +181,9 @@ def count_detect(user_action,clusters_in_view,prior,previous_x):
         pass
     return hesitation
 
-def Smooth_ViewSearch(user_action,clusters_in_view,prior):
+def Smooth_ViewSearch(user_action,clusters_in_view):
     n=len(prior)
+    print
     Theta=list(range(0,n))
     if user_action==1:
         if len(clusters_in_view)==1:
@@ -217,7 +219,7 @@ def Smooth_ViewSearch(user_action,clusters_in_view,prior):
     if len(X)==1:
         view=X[0]
     else:
-        xsearch=max_IG(X,prior,n_y=4)
+        xsearch=max_IG(X,n_y=4)
         max_index=max(xsearch)
         max_which=np.array(range(len(xsearch)))[xsearch==max_index]
         view=X[max_which[random.randint(0,len(max_which)-1)]]
@@ -225,11 +227,11 @@ def Smooth_ViewSearch(user_action,clusters_in_view,prior):
             view=view[:][0]
     return(view)
 
-def BIG_ViewSearch(user_action,prior):
+def BIG_ViewSearch(user_action):
     n=len(prior)
     Theta=list(range(0,n))
     X=views(Theta)
-    xsearch=max_IG(X,prior,n_y=4) # returns a list of all the values of expected information gain for all possible views
+    xsearch=max_IG(X,n_y=4) # returns a list of all the values of expected information gain for all possible views
     max_index=max(xsearch) # maximum value among all expected information gains
     max_which=np.array(range(len(xsearch)))[xsearch==max_index]
     view=X[max_which[random.randint(0,len(max_which)-1)]]
